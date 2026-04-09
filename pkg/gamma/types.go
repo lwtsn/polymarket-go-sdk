@@ -230,18 +230,18 @@ type Market struct {
 	EnableOrderBook       bool    `json:"enableOrderBook,omitempty"`
 	QuestionID            string  `json:"questionId,omitempty"`
 	Volume24hr            float64 `json:"volume24hr,omitempty"`
-	Spread                string  `json:"spread,omitempty"`
-	BestBid               string  `json:"bestBid,omitempty"`
-	BestAsk               string  `json:"bestAsk,omitempty"`
-	LastTradePrice        string  `json:"lastTradePrice,omitempty"`
+	Spread                float64 `json:"spread,omitempty"`
+	BestBid               float64 `json:"bestBid,omitempty"`
+	BestAsk               float64 `json:"bestAsk,omitempty"`
+	LastTradePrice        float64 `json:"lastTradePrice,omitempty"`
 	CommentCount          int     `json:"commentCount,omitempty"`
 	Cyom                  bool    `json:"cyom,omitempty"`
-	OpenInterest          string  `json:"openInterest,omitempty"`
-	VolumeNum             string  `json:"volumeNum,omitempty"`
-	LiquidityNum          string  `json:"liquidityNum,omitempty"`
-	Volume1wk             int     `json:"volume1wk,omitempty"`
-	Volume1mo             int     `json:"volume1mo,omitempty"`
-	Volume1yr             int     `json:"volume1yr,omitempty"`
+	OpenInterest          float64 `json:"openInterest,omitempty"`
+	VolumeNum             float64 `json:"volumeNum,omitempty"`
+	LiquidityNum          float64 `json:"liquidityNum,omitempty"`
+	Volume1wk             float64 `json:"volume1wk,omitempty"`
+	Volume1mo             float64 `json:"volume1mo,omitempty"`
+	Volume1yr             float64 `json:"volume1yr,omitempty"`
 	GameStartTime         string  `json:"gameStartTime,omitempty"`
 	SecondsDelay          int     `json:"secondsDelay,omitempty"`
 	Category              string  `json:"category,omitempty"`
