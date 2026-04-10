@@ -17,6 +17,9 @@ import (
 const (
 	conditionalTokensABI = `[{"inputs":[{"internalType":"address","name":"oracle","type":"address"},{"internalType":"bytes32","name":"questionId","type":"bytes32"},{"internalType":"uint256","name":"outcomeSlotCount","type":"uint256"}],"name":"prepareCondition","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"collateralToken","type":"address"},{"internalType":"bytes32","name":"parentCollectionId","type":"bytes32"},{"internalType":"bytes32","name":"conditionId","type":"bytes32"},{"internalType":"uint256[]","name":"partition","type":"uint256[]"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"splitPosition","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"collateralToken","type":"address"},{"internalType":"bytes32","name":"parentCollectionId","type":"bytes32"},{"internalType":"bytes32","name":"conditionId","type":"bytes32"},{"internalType":"uint256[]","name":"partition","type":"uint256[]"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"mergePositions","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"collateralToken","type":"address"},{"internalType":"bytes32","name":"parentCollectionId","type":"bytes32"},{"internalType":"bytes32","name":"conditionId","type":"bytes32"},{"internalType":"uint256[]","name":"indexSets","type":"uint256[]"}],"name":"redeemPositions","outputs":[],"stateMutability":"nonpayable","type":"function"}]`
 	negRiskAdapterABI    = `[{"inputs":[{"internalType":"bytes32","name":"conditionId","type":"bytes32"},{"internalType":"uint256[]","name":"amounts","type":"uint256[]"}],"name":"redeemPositions","outputs":[],"stateMutability":"nonpayable","type":"function"}]`
+
+	// Minimal ERC-20 ABI: only allowance() and approve() are needed for the pre-flight check.
+	erc20ABI = `[{"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"address","name":"spender","type":"address"}],"name":"allowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}]`
 )
 
 // Use unified error definitions from pkg/errors
@@ -34,6 +37,7 @@ type clientImpl struct {
 	txOpts            *bind.TransactOpts
 	conditionalTokens *bind.BoundContract
 	negRiskAdapter    *bind.BoundContract
+	ctfAddress        common.Address // address of ConditionalTokens contract (spender for ERC-20 approvals)
 }
 
 // NewClient creates a lightweight CTF client for ID calculations.
@@ -80,6 +84,7 @@ func newClientWithConfig(backend Backend, txOpts *bind.TransactOpts, chainID int
 		txOpts:            txOpts,
 		conditionalTokens: contract,
 		negRiskAdapter:    neg,
+		ctfAddress:        cfg.ConditionalTokens,
 	}, nil
 }
 
@@ -204,6 +209,56 @@ func (c *clientImpl) RedeemNegRisk(ctx context.Context, req *RedeemNegRiskReques
 		return RedeemNegRiskResponse{}, err
 	}
 	return RedeemNegRiskResponse{TransactionHash: tx.Hash, BlockNumber: tx.BlockNumber}, nil
+}
+
+// EnsureCollateralApproved checks the EOA's ERC-20 allowance for the CTF
+// contract. If the allowance is below amount, it submits an approve(max)
+// transaction and waits for it to be mined before returning.
+func (c *clientImpl) EnsureCollateralApproved(ctx context.Context, token common.Address, amount *big.Int) error {
+	if c.backend == nil {
+		return ErrMissingBackend
+	}
+	if c.txOpts == nil {
+		return ErrMissingTransactor
+	}
+
+	parsedABI, err := abi.JSON(strings.NewReader(erc20ABI))
+	if err != nil {
+		return fmt.Errorf("parse erc20 ABI: %w", err)
+	}
+	erc20 := bind.NewBoundContract(token, parsedABI, c.backend, c.backend, c.backend)
+
+	// ── Read current allowance ────────────────────────────────────────────────
+	var results []interface{}
+	callOpts := &bind.CallOpts{Context: ctx, From: c.txOpts.From}
+	if err := erc20.Call(callOpts, &results, "allowance", c.txOpts.From, c.ctfAddress); err != nil {
+		return fmt.Errorf("read allowance: %w", err)
+	}
+	if len(results) == 0 {
+		return fmt.Errorf("allowance returned no result")
+	}
+	allowance, ok := results[0].(*big.Int)
+	if !ok || allowance == nil {
+		return fmt.Errorf("unexpected allowance result type")
+	}
+
+	// Already approved — nothing to do.
+	if allowance.Cmp(amount) >= 0 {
+		return nil
+	}
+
+	// ── Submit approve(spender, max) ──────────────────────────────────────────
+	maxApproval := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1)) // 2^256 - 1
+	opts := *c.txOpts
+	opts.Context = ctx
+	tx, err := erc20.Transact(&opts, "approve", c.ctfAddress, maxApproval)
+	if err != nil {
+		return fmt.Errorf("approve usdc: %w", err)
+	}
+	if _, err := bind.WaitMined(ctx, c.backend, tx); err != nil {
+		return fmt.Errorf("wait approve receipt: %w", err)
+	}
+	return nil
 }
 
 type txResult struct {
