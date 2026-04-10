@@ -17,6 +17,17 @@ import (
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 )
 
+const (
+	// CTFExchangeAddress is the Polymarket CTF Exchange contract on Polygon mainnet.
+	// Used as the EIP-712 VerifyingContract for standard (binary) markets.
+	CTFExchangeAddress = "0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E"
+
+	// NegRiskExchangeAddress is the Polymarket NegRisk Exchange contract on Polygon mainnet.
+	// Used as the EIP-712 VerifyingContract for multi-outcome NegRisk markets.
+	// Orders signed with the wrong contract produce an invalid signature error (NET-002).
+	NegRiskExchangeAddress = "0xC5d563A36AE78145C45a50134d48A1215220f80a"
+)
+
 // CreateOrder builds and signs an order, then posts it to the CLOB.
 // This is a higher-level helper that combines signing and posting.
 func (c *clientImpl) CreateOrder(ctx context.Context, order *clobtypes.Order) (clobtypes.OrderResponse, error) {
@@ -94,11 +105,19 @@ func signOrderWithCreds(signer auth.Signer, apiKey *auth.APIKey, order *clobtype
 		}
 	}
 
+	// NegRisk markets are settled through a separate exchange contract.
+	// The VerifyingContract in the EIP-712 domain MUST match the exchange
+	// that will verify the signature on-chain; using the wrong address produces
+	// an invalid signature error (NET-002).
+	verifyingContract := CTFExchangeAddress
+	if order.NegRisk {
+		verifyingContract = NegRiskExchangeAddress
+	}
 	domain := &apitypes.TypedDataDomain{
 		Name:              "Polymarket CTF Exchange",
 		Version:           "1",
 		ChainId:           (*math.HexOrDecimal256)(signer.ChainID()),
-		VerifyingContract: "0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E", // Exchange Contract Address (Mainnet)
+		VerifyingContract: verifyingContract,
 	}
 
 	typesDef := apitypes.Types{

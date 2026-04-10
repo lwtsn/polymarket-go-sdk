@@ -487,6 +487,10 @@ type (
 		FeeRateBps    types.Decimal `json:"fee_rate_bps"`
 		Nonce         types.U256    `json:"nonce"`
 		SignatureType *int          `json:"signature_type,omitempty"` // 0=EOA, 1=Proxy, 2=Safe
+		// NegRisk indicates this order is for a NegRisk market. When true, the
+		// EIP-712 domain uses the NegRisk Exchange contract instead of the CTF
+		// Exchange contract. Not serialised into the on-wire order payload.
+		NegRisk bool `json:"-"`
 	}
 
 	PriceHistoryPoint struct {

@@ -316,6 +316,11 @@ func (b *OrderBuilder) BuildMarketWithContext(ctx context.Context) (*clobtypes.S
 		return nil, err
 	}
 
+	negRisk, err := b.resolveNegRisk(ctx, b.tokenID)
+	if err != nil {
+		return nil, err
+	}
+
 	truncScale := tickScale + lotSizeScale
 	rawAmount := b.amount.value
 	var makerAmount, takerAmount decimal.Decimal
@@ -389,6 +394,7 @@ func (b *OrderBuilder) BuildMarketWithContext(ctx context.Context) (*clobtypes.S
 		FeeRateBps:    types.Decimal(decimal.NewFromInt(feeRateBps)),
 		Nonce:         types.U256{Int: nonce},
 		SignatureType: &sigType,
+		NegRisk:       negRisk,
 	}
 
 	return &clobtypes.SignableOrder{
@@ -444,6 +450,11 @@ func (b *OrderBuilder) buildLimit(ctx context.Context) (*clobtypes.Order, error)
 	}
 
 	feeRateBps, err := b.resolveFeeRateBps(ctx, b.tokenID)
+	if err != nil {
+		return nil, err
+	}
+
+	negRisk, err := b.resolveNegRisk(ctx, b.tokenID)
 	if err != nil {
 		return nil, err
 	}
@@ -521,5 +532,6 @@ func (b *OrderBuilder) buildLimit(ctx context.Context) (*clobtypes.Order, error)
 		FeeRateBps:    types.Decimal(decimal.NewFromInt(feeRateBps)),
 		Nonce:         types.U256{Int: nonce},
 		SignatureType: &sigType,
+		NegRisk:       negRisk,
 	}, nil
 }

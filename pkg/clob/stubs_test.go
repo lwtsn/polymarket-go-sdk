@@ -27,6 +27,10 @@ func newStubClient() *stubClient {
 	}
 }
 
+func (s *stubClient) NegRisk(ctx context.Context, req *clobtypes.NegRiskRequest) (clobtypes.NegRiskResponse, error) {
+	return clobtypes.NegRiskResponse{NegRisk: false}, nil
+}
+
 func (s *stubClient) OrderBook(ctx context.Context, req *clobtypes.BookRequest) (clobtypes.OrderBookResponse, error) {
 	return s.book, nil
 }
