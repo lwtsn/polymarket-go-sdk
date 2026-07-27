@@ -38,3 +38,8 @@ Thumbs.db
 *.swn
 .claude/
 .worktrees/
+
+# Built example binaries (never commit)
+/bot
+/complete
+*.so
