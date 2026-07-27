@@ -184,6 +184,14 @@ func BuildL1Headers(signer Signer, timestamp int64, nonce int64) (http.Header, e
 		timestamp = time.Now().Unix()
 	}
 
+	// For Safe wallets, use the owner (EOA) address in the message and headers,
+	// since the signature was created with the owner's private key.
+	// On-chain operations use the Safe address, but API key derivation uses the owner.
+	signingAddr := signer.Address()
+	if safeSigner, ok := signer.(*SafeSigner); ok {
+		signingAddr = safeSigner.OwnerAddress()
+	}
+
 	domain := &apitypes.TypedDataDomain{
 		Name:    ClobAuthDomain.Name,
 		Version: ClobAuthDomain.Version,
@@ -191,7 +199,7 @@ func BuildL1Headers(signer Signer, timestamp int64, nonce int64) (http.Header, e
 	}
 
 	message := apitypes.TypedDataMessage{
-		"address":   signer.Address().Hex(),
+		"address":   signingAddr.Hex(),
 		"timestamp": fmt.Sprintf("%d", timestamp),
 		"nonce":     (*math.HexOrDecimal256)(big.NewInt(nonce)),
 		"message":   "This message attests that I control the given wallet",
@@ -203,7 +211,7 @@ func BuildL1Headers(signer Signer, timestamp int64, nonce int64) (http.Header, e
 	}
 
 	headers := http.Header{}
-	headers.Set(HeaderPolyAddress, signer.Address().Hex())
+	headers.Set(HeaderPolyAddress, signingAddr.Hex())
 	headers.Set(HeaderPolySignature, hexutil.Encode(sig))
 	headers.Set(HeaderPolyTimestamp, fmt.Sprintf("%d", timestamp))
 	headers.Set(HeaderPolyNonce, fmt.Sprintf("%d", nonce))

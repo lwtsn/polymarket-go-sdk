@@ -234,6 +234,7 @@ func (c *clientImpl) CreateAPIKeyWithNonce(ctx context.Context, nonce int64) (cl
 	var resp clobtypes.APIKeyResponse
 	// Note: We use CallWithHeaders to inject L1 headers.
 	// clobtypes.CreateAPIKey uses POST /auth/api-key
+	// Signature type is inferred from signer type (SafeSigner vs regular)
 	err = c.httpClient.CallWithHeaders(ctx, "POST", "/auth/api-key", nil, nil, &resp, headers)
 	return resp, mapError(err)
 }
@@ -278,6 +279,9 @@ func (c *clientImpl) DeriveAPIKeyWithNonce(ctx context.Context, nonce int64) (cl
 		auth.HeaderPolyNonce:     headersRaw.Get(auth.HeaderPolyNonce),
 		auth.HeaderPolySignature: headersRaw.Get(auth.HeaderPolySignature),
 	}
+
+	// DO NOT include signature_type - it's inferred from the L1 headers
+	// The signature and address in headers determine the key's scope
 	err = c.httpClient.CallWithHeaders(ctx, "GET", "/auth/derive-api-key", nil, nil, &resp, headers)
 	return resp, mapError(err)
 }

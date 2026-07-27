@@ -22,6 +22,10 @@ var contractConfigs = map[int64]contractConfig{
 	},
 }
 
+// NegRiskExchangeAddress is the Polymarket NegRisk CTF Exchange on Polygon.
+// USDC and conditional tokens must be approved to this address for CLOB orders to settle.
+const NegRiskExchangeAddress = "0xC5d563A36AE78145C45a50134d48A1215220f80a"
+
 var negRiskConfigs = map[int64]contractConfig{
 	PolygonChainID: {
 		ConditionalTokens: common.HexToAddress("0x4D97DCd97eC945f40cF65F87097ACe5EA0476045"),

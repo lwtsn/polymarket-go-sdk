@@ -62,6 +62,11 @@ func (c *clientImpl) signOrder(order *clobtypes.Order) (*clobtypes.SignedOrder, 
 	return signOrderWithCreds(c.signer, c.apiKey, order, &c.signatureType, c.funder, c.saltGenerator)
 }
 
+// SignOrder signs an order without posting it. Use with PostOrders for batch submission.
+func (c *clientImpl) SignOrder(order *clobtypes.Order) (*clobtypes.SignedOrder, error) {
+	return c.signOrder(order)
+}
+
 // SignOrder builds an EIP-712 signature for the given order without posting it.
 func SignOrder(signer auth.Signer, apiKey *auth.APIKey, order *clobtypes.Order) (*clobtypes.SignedOrder, error) {
 	return signOrderWithCreds(signer, apiKey, order, nil, nil, nil)
@@ -167,10 +172,23 @@ func signOrderWithCreds(signer auth.Signer, apiKey *auth.APIKey, order *clobtype
 		expiration = order.Expiration.Int
 	}
 
+	// For Safe wallets: use the owner (EOA) address in the order signature
+	// because the API key was derived for the owner address, not the Safe address.
+	// SafeSigner.SignTypedData will sign with the owner key, but the message must
+	// have the owner address in the "signer" field to match the API key.
+	signerAddr := signer.Address()
+	if safeSigner, ok := signer.(*auth.SafeSigner); ok {
+		signerAddr = safeSigner.OwnerAddress()
+	}
+
+	// Write the resolved signer address back to the Order struct so the POST body
+	// serializes the same address that was used in the EIP-712 signed message.
+	order.Signer = types.Address(signerAddr)
+
 	message := apitypes.TypedDataMessage{
 		"salt":          (*math.HexOrDecimal256)(order.Salt.Int),
 		"maker":         order.Maker.String(),
-		"signer":        signer.Address().String(),
+		"signer":        signerAddr.String(),
 		"taker":         order.Taker.String(),
 		"tokenId":       (*math.HexOrDecimal256)(order.TokenID.Int),
 		"makerAmount":   (*math.HexOrDecimal256)(order.MakerAmount.BigInt()),
@@ -189,7 +207,7 @@ func signOrderWithCreds(signer auth.Signer, apiKey *auth.APIKey, order *clobtype
 
 	owner := apiKey.Key
 	if owner == "" {
-		owner = signer.Address().String()
+		owner = signerAddr.String()
 	}
 
 	return &clobtypes.SignedOrder{

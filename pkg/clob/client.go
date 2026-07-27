@@ -52,6 +52,8 @@ type Client interface {
 	CreateOrderWithOptions(ctx context.Context, order *clobtypes.Order, opts *clobtypes.OrderOptions) (clobtypes.OrderResponse, error)
 	// CreateOrderFromSignable submits an order that has already been prepared as a SignableOrder.
 	CreateOrderFromSignable(ctx context.Context, order *clobtypes.SignableOrder) (clobtypes.OrderResponse, error)
+	// SignOrder signs an order without posting it. Use with PostOrders for batch submission.
+	SignOrder(order *clobtypes.Order) (*clobtypes.SignedOrder, error)
 
 	// -- System Status --
 

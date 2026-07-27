@@ -289,7 +289,15 @@ func (c *Client) doCall(ctx context.Context, method, path string, query url.Valu
 				return fmt.Errorf("failed to sign request: %w", err)
 			}
 
-			req.Header.Set(auth.HeaderPolyAddress, c.signer.Address().Hex())
+			// For Safe wallets, the API key was derived for the owner (EOA) address.
+			// So we must use owner address in the PolyAddress header, not Safe address.
+			// Otherwise Polymarket rejects the API key as unauthorized.
+			authAddr := c.signer.Address()
+			if safeSigner, ok := c.signer.(*auth.SafeSigner); ok {
+				authAddr = safeSigner.OwnerAddress()
+			}
+
+			req.Header.Set(auth.HeaderPolyAddress, authAddr.Hex())
 			req.Header.Set(auth.HeaderPolyAPIKey, c.apiKey.Key)
 			req.Header.Set(auth.HeaderPolyPassphrase, c.apiKey.Passphrase)
 			req.Header.Set(auth.HeaderPolyTimestamp, fmt.Sprintf("%d", ts))

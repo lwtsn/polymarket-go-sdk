@@ -60,6 +60,16 @@ const (
 type SaltGenerator func() (*big.Int, error)
 
 // NewOrderBuilder creates a new order builder.
+// resolveSignerAddress returns the address to use in the Order's Signer field.
+// For SafeSigner: returns the owner (EOA) address to match the API key.
+// For EOA: returns the signer's address directly.
+func resolveSignerAddress(signer auth.Signer) types.Address {
+	if safeSigner, ok := signer.(*auth.SafeSigner); ok {
+		return types.Address(safeSigner.OwnerAddress())
+	}
+	return signer.Address()
+}
+
 func NewOrderBuilder(client Client, signer auth.Signer) *OrderBuilder {
 	builder := &OrderBuilder{
 		client: client,
@@ -383,7 +393,7 @@ func (b *OrderBuilder) BuildMarketWithContext(ctx context.Context) (*clobtypes.S
 
 	order := &clobtypes.Order{
 		Salt:          types.U256{Int: salt},
-		Signer:        b.signer.Address(),
+		Signer:        resolveSignerAddress(b.signer),
 		Maker:         maker,
 		Taker:         taker,
 		TokenID:       types.U256{Int: tokenIDInt},
@@ -521,7 +531,7 @@ func (b *OrderBuilder) buildLimit(ctx context.Context) (*clobtypes.Order, error)
 
 	return &clobtypes.Order{
 		Salt:          types.U256{Int: salt},
-		Signer:        b.signer.Address(),
+		Signer:        resolveSignerAddress(b.signer),
 		Maker:         maker,
 		Taker:         taker,
 		TokenID:       types.U256{Int: tokenIDInt},
